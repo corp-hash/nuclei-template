@@ -1,0 +1,74 @@
+id: negative-quantity-ticket-cart-auth
+
+info:
+  name: Negative Quantity Ticket Cart Manipulation with Auth
+  author: security-researcher
+  severity: high
+  description: Tests negative quantity vulnerability with authentication support
+
+variables:
+  product_id: "12345"
+  # Multiple authentication options
+  bearer_token: "{{token}}"
+  api_key: "{{api_key}}"
+  session_cookie: "{{session}}"
+
+http:
+  # Test with Bearer Token authentication
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/products"
+    
+    headers:
+      Authorization: "Bearer {{bearer_token}}"
+      Content-Type: "application/json"
+
+    # Extract actual product IDs from the response
+    extractors:
+      - type: json
+        name: available_product_id
+        json: 
+          - "products[0].id"
+          - "items[0].product_id"
+          - "id"
+        part: body
+
+    matchers:
+      - type: status
+        status:
+          - 200
+
+  # Main test with authentication
+  - method: POST
+    path:
+      - "{{BaseURL}}/api/cart/add"
+      - "{{BaseURL}}/cart/add"
+
+    body: |
+      {
+        "product_id": "{{product_id}}",
+        "quantity": -1,
+        "price": 100
+      }
+
+    # Multiple authentication headers
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{bearer_token}}"
+      X-API-Key: "{{api_key}}"
+      Cookie: "session={{session_cookie}}"
+
+    cookie-reuse: true
+
+    matchers-condition: or
+    matchers:
+      - type: word
+        words:
+          - '"success":true'
+          - '"added":true'
+        part: body
+
+      - type: regex
+        regex:
+          - '"total":\s*-[0-9]'
+        part: body
